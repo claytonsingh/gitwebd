@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -108,18 +109,16 @@ func main() {
 	r.GET("/repos/:namespace/:repo/tags", WithRepo(func(c Context) {
 		r := make([]any, 0)
 		if tags, err := c.repository.repo.Tags(); err == nil {
-			tags.ForEach(func(t *plumbing.Reference) error {
-				if ref, err := c.repository.repo.Tag(c.Param("tag")); err == nil {
-					tag, err := c.repository.repo.TagObject(ref.Hash())
-					switch err {
-					case nil:
-						if tag.TargetType == plumbing.CommitObject {
-							r = append(r, FormatTagRef(c, ref, tag))
-						}
-					case plumbing.ErrObjectNotFound:
-						if _, err := c.repository.repo.CommitObject(ref.Hash()); err == nil {
-							r = append(r, FormatTagRef(c, ref, nil))
-						}
+			tags.ForEach(func(ref *plumbing.Reference) error {
+				tag, err := c.repository.repo.TagObject(ref.Hash())
+				switch err {
+				case nil:
+					if tag.TargetType == plumbing.CommitObject {
+						r = append(r, FormatTagRef(c, ref, tag))
+					}
+				case plumbing.ErrObjectNotFound:
+					if _, err := c.repository.repo.CommitObject(ref.Hash()); err == nil {
+						r = append(r, FormatTagRef(c, ref, nil))
 					}
 				}
 				return nil
@@ -234,5 +233,9 @@ func main() {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 	}))
 
-	log.Fatal(r.Run()) // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+	listen := os.Getenv("LISTEN")
+	if listen == "" {
+		listen = "127.0.0.1:8080"
+	}
+	log.Fatal(r.Run(listen)) // listen on 127.0.0.1:8080
 }
