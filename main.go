@@ -61,6 +61,7 @@ func main() {
 		for _, repo := range repos {
 			r = append(r, gin.H{
 				"name":        repo.Name,
+				"namespace":   repo.Namespace,
 				"description": repo.Description,
 				"url":         BuildUri(c, "repos", repo.Url),
 			})

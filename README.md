@@ -3,10 +3,10 @@ Provides a read-only restful interface for accessing data from Git repositories 
 Modeled off the GitHub API for compatibility (see https://docs.github.com/en/rest).
 
 # Configuration
-| Environment Variable | Default value    | Description                |
-|----------------------|------------------|----------------------------|
-| `LISTEN`             | `127.0.0.1:8080` | IP and port to listen on   |
-| `CONFIG_PATH`        | `config.yaml`    | Configuration file to load |
+| Environment Variable | Default value    | Description              
+|----------------------|------------------|------------
+| `LISTEN`             | `127.0.0.1:8080` | IP and port to listen on.
+| `CONFIG_PATH`        | `config.yaml`    | Configuration file to load. If undefined and `config.yaml` can not be read then try loading the repo at the current working directory.
 
 # Notes
 - All returned urls will be the same as the requested host header.
@@ -244,7 +244,7 @@ GET http://127.0.0.1:8080/repos/local/self/git/trees/056392b008ba5142234b9c900d2
 ```
 
 # Blobs
-Retrieves a blob with metadata with content base64 encoded.
+Retrieves a blob with metadata with content base64 encoded
 ```
 GET http://127.0.0.1:8080/repos/local/{namespace}/{repo_name}/git/blobs/{blob_sha}
 GET http://127.0.0.1:8080/repos/local/self/git/blobs/b9414b519819f2512cbed8cf35acf6c5dfe88d83
