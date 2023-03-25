@@ -3,13 +3,28 @@ Provides a read-only restful interface for accessing data from Git repositories 
 Modeled off the GitHub API for compatibility (see https://docs.github.com/en/rest).
 
 # Configuration
-| Environment Variable | Default value    | Description              |
-|----------------------|------------------|--------------------------|
-| `LISTEN`             | `127.0.0.1:8080` | IP and port to listen on |
+| Environment Variable | Default value    | Description                |
+|----------------------|------------------|----------------------------|
+| `LISTEN`             | `127.0.0.1:8080` | IP and port to listen on   |
+| `CONFIG_PATH`        | `config.yaml`    | Configuration file to load |
 
 # Notes
 - All returned urls will be the same as the requested host header.
 - If you are using https set `X-Forwarded-Proto: https` upstream on your reverse proxy.
+
+# Configuration File Format
+A list of repos to load. The namespace and name directly translate to the url. The path may be a relative or absolute path to the repo.
+```
+repos:
+- namespace: local
+  name: gitwebd
+  path: '/opt/gitwebd/'
+  description: 'The best repo'
+- namespace: local
+  name: relative
+  path: '../my_other_project/'
+  description: 'My Secret Project'
+```
 
 # Indexes
 ```

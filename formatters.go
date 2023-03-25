@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -13,7 +12,7 @@ import (
 
 type Context struct {
 	*gin.Context
-	repository Repo
+	repository *Repo
 	namespace  string
 	repo       string
 }
@@ -32,13 +31,6 @@ func BuildUri(c *gin.Context, parts ...string) string {
 		u.Scheme = "https"
 	}
 	return u.String()
-}
-
-type Repo struct {
-	name        string
-	description string
-	url         string
-	repo        *git.Repository
 }
 
 func FormatRef(c *gin.Context, m plumbing.Hash, path string) gin.H {
@@ -157,7 +149,7 @@ func FormatTree(c Context, tree *object.Tree, recursive bool) gin.H {
 	} else {
 		for _, entry := range tree.Entries {
 			if entry.Mode.IsFile() {
-				blob, _ := object.GetBlob(c.repository.repo.Storer, entry.Hash)
+				blob, _ := object.GetBlob(c.repository.Repo.Storer, entry.Hash)
 				file := object.NewFile(entry.Name, entry.Mode, blob)
 				r = append(r, FormatFile(c.Context, file, tree.Hash))
 			} else if entry.Mode == filemode.Dir {

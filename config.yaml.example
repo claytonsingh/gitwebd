@@ -1,0 +1,9 @@
+repos:
+- namespace: local
+  name: gitwebd
+  path: '/opt/gitwebd/'
+  description: 'git web daemon'
+- namespace: local
+  name: current
+  path: './'
+  description: 'my local repo'
