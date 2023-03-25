@@ -183,7 +183,7 @@ func main() {
 		var recursive = false
 		switch strings.ToLower(c.Query("recursive")) {
 		case "1", "true", "yes":
-			recursive = false
+			recursive = true
 		}
 		sha := plumbing.NewHash(c.Param("sha"))
 		if tree, err := c.repository.repo.TreeObject(sha); err == nil {
