@@ -37,7 +37,7 @@ func main() {
 			namespace := c.Param("namespace")
 			reponame := c.Param("repo")
 			repository, ok := repos[fmt.Sprintf("%s/%s", namespace, reponame)]
-			if ok {
+			if ok && repository != nil {
 				handler(Context{
 					Context:    c,
 					repository: repository,
@@ -51,6 +51,7 @@ func main() {
 	}
 
 	r := gin.Default()
+	r.SetTrustedProxies(nil)
 
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusTemporaryRedirect, "/repos")
@@ -78,7 +79,7 @@ func main() {
 			"indexes": gin.H{
 				"branches": c.BuildUri("repos", c.namespace, c.repo, "branches"),
 				"tags":     c.BuildUri("repos", c.namespace, c.repo, "tags"),
-				// "commits":  c.BuildUri("repos", c.namespace, c.repo, "git/commits"),
+				// "commits":  c.BuildUri("repos", c.namespace, c.repo, "commits"),
 			},
 		})
 	}))
@@ -101,6 +102,16 @@ func main() {
 		if branch, err := c.repository.Repo.Storer.Reference(plumbing.NewBranchReferenceName(c.Param("branch"))); err == nil {
 			if commit, err := c.repository.Repo.CommitObject(branch.Hash()); err == nil {
 				c.IndentedJSON(http.StatusOK, FormatBranchFull(c, branch, commit))
+				return
+			}
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+	}))
+
+	r.GET("/repos/:namespace/:repo/branches/:branch/raw/*path", WithRepo(func(c Context) {
+		if branch, err := c.repository.Repo.Storer.Reference(plumbing.NewBranchReferenceName(c.Param("branch"))); err == nil {
+			if commit, err := c.repository.Repo.CommitObject(branch.Hash()); err == nil {
+				c.Redirect(http.StatusTemporaryRedirect, c.FormatRawUri(commit.TreeHash, c.Param("path")))
 				return
 			}
 		}
@@ -153,8 +164,32 @@ func main() {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 	}))
 
+	r.GET("/repos/:namespace/:repo/tags/:tag/raw/*path", WithRepo(func(c Context) {
+		if ref, err := c.repository.Repo.Tag(c.Param("tag")); err == nil {
+			tag, err := c.repository.Repo.TagObject(ref.Hash())
+			switch err {
+			case nil:
+				if tag.TargetType == plumbing.CommitObject {
+					if commit, err := c.repository.Repo.CommitObject(tag.Target); err == nil {
+						c.Redirect(http.StatusTemporaryRedirect, c.FormatRawUri(commit.TreeHash, c.Param("path")))
+						return
+					}
+				}
+			case plumbing.ErrObjectNotFound:
+				if commit, err := c.repository.Repo.CommitObject(ref.Hash()); err == nil {
+					c.Redirect(http.StatusTemporaryRedirect, c.FormatRawUri(commit.TreeHash, c.Param("path")))
+					return
+				}
+			default:
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+	}))
+
 	// commit index
-	r.GET("/repos/:namespace/:repo/git/commits", WithRepo(func(c Context) {
+	r.GET("/repos/:namespace/:repo/commits", WithRepo(func(c Context) {
 		r := make([]any, 0)
 		if commit, err := c.repository.Repo.CommitObjects(); err == nil {
 			commit.ForEach(func(m *object.Commit) error {
@@ -171,7 +206,7 @@ func main() {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 	}))
 
-	r.GET("/repos/:namespace/:repo/git/commits/:sha", WithRepo(func(c Context) {
+	r.GET("/repos/:namespace/:repo/commits/:sha", WithRepo(func(c Context) {
 		sha := plumbing.NewHash(c.Param("sha"))
 		if commit, err := c.repository.Repo.CommitObject(sha); err == nil {
 			c.IndentedJSON(http.StatusOK, FormatCommitFull(c.Context, commit))
@@ -180,8 +215,17 @@ func main() {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 	}))
 
+	r.GET("/repos/:namespace/:repo/commits/:sha/raw/*path", WithRepo(func(c Context) {
+		sha := plumbing.NewHash(c.Param("sha"))
+		if commit, err := c.repository.Repo.CommitObject(sha); err == nil {
+			c.Redirect(http.StatusTemporaryRedirect, c.FormatRawUri(commit.TreeHash, c.Param("path")))
+			return
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+	}))
+
 	// trees
-	r.GET("/repos/:namespace/:repo/git/trees/:sha", WithRepo(func(c Context) {
+	r.GET("/repos/:namespace/:repo/trees/:sha", WithRepo(func(c Context) {
 		var recursive = false
 		switch strings.ToLower(c.Query("recursive")) {
 		case "1", "true", "yes":
@@ -197,7 +241,7 @@ func main() {
 	}))
 
 	// blobs
-	r.GET("/repos/:namespace/:repo/git/blobs/:sha", WithRepo(func(c Context) {
+	r.GET("/repos/:namespace/:repo/blobs/:sha", WithRepo(func(c Context) {
 		sha := plumbing.NewHash(c.Param("sha"))
 		if blob, err := c.repository.Repo.BlobObject(sha); err == nil {
 			if r, err := blob.Reader(); err == nil {
@@ -207,7 +251,7 @@ func main() {
 				buff.ReadFrom(r)
 
 				c.IndentedJSON(http.StatusOK, gin.H{
-					"url":     c.BuildUri("repos", c.namespace, c.repo, "git/blobs", sha.String()),
+					"url":     c.BuildUri("repos", c.namespace, c.repo, "blobs", sha.String()),
 					"sha":     sha.String(),
 					"size":    blob.Size,
 					"content": base64.RawStdEncoding.EncodeToString(buff.Bytes()),
@@ -220,16 +264,26 @@ func main() {
 
 	// raw file download
 	r.GET("/repos/:namespace/:repo/raw/:sha/*path", WithRepo(func(c Context) {
-		sha := plumbing.NewHash(c.Param("sha"))
-		if tree, err := c.repository.Repo.TreeObject(sha); err == nil {
+
+		read := func(tree *object.Tree) error {
 			if tree, err := tree.File(c.Param("path")[1:]); err == nil {
 				blob := tree.Blob
 				if reader, err := blob.Reader(); err == nil {
 					defer reader.Close()
 
 					c.DataFromReader(http.StatusOK, blob.Size, "application/octet-stream", reader, nil)
-					return
+					return nil
+				} else {
+					return err
 				}
+			} else {
+				return err
+			}
+		}
+
+		if tree, err := c.repository.Repo.TreeObject(plumbing.NewHash(c.Param("sha"))); err == nil {
+			if read(tree) == nil {
+				return
 			}
 		}
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})

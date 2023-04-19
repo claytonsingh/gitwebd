@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"net/url"
 	"strings"
 
@@ -33,6 +34,13 @@ func BuildUri(c *gin.Context, parts ...string) string {
 	return u.String()
 }
 
+func (this *Context) FormatRawUri(tree plumbing.Hash, path string) string {
+	if path[0] == '/' {
+		path = path[1:]
+	}
+	return this.BuildUri("repos", this.Param("namespace"), this.Param("repo"), "raw", tree.String(), path)
+}
+
 func FormatRef(c *gin.Context, m plumbing.Hash, path string) gin.H {
 	hash := m.String()
 	return gin.H{
@@ -42,7 +50,7 @@ func FormatRef(c *gin.Context, m plumbing.Hash, path string) gin.H {
 }
 
 func FormatCommitRef(c *gin.Context, m plumbing.Hash) gin.H {
-	return FormatRef(c, m, "git/commits")
+	return FormatRef(c, m, "commits")
 }
 
 func FormatCommitFull(c *gin.Context, m *object.Commit) gin.H {
@@ -54,7 +62,7 @@ func FormatCommitFull(c *gin.Context, m *object.Commit) gin.H {
 	})
 	return gin.H{
 		"sha":       hash,
-		"url":       BuildUri(c, "repos", c.Param("namespace"), c.Param("repo"), "git/commits", hash),
+		"url":       BuildUri(c, "repos", c.Param("namespace"), c.Param("repo"), "commits", hash),
 		"message":   m.Message,
 		"author":    FormatSignature(c, m.Author),
 		"committer": FormatSignature(c, m.Committer),
@@ -65,8 +73,8 @@ func FormatCommitFull(c *gin.Context, m *object.Commit) gin.H {
 
 func FormatFile(c *gin.Context, f *object.File, m plumbing.Hash) gin.H {
 	return gin.H{
-		"url": BuildUri(c, "repos", c.Param("namespace"), c.Param("repo"), "git/blobs", f.Hash.String()),
-		//"raw_url": BuildUri(c, "repos", c.Param("namespace"), c.Param("repo"), "git/blobs", f.Hash.String(), "raw"),
+		"url": BuildUri(c, "repos", c.Param("namespace"), c.Param("repo"), "blobs", f.Hash.String()),
+		//"raw_url": BuildUri(c, "repos", c.Param("namespace"), c.Param("repo"), "blobs", f.Hash.String(), "raw"),
 		"raw_url": BuildUri(c, "repos", c.Param("namespace"), c.Param("repo"), "raw", m.String(), f.Name),
 		"sha":     f.Hash.String(),
 		"mode":    f.Mode.String(),
@@ -85,7 +93,7 @@ func FormatSignature(c *gin.Context, a object.Signature) gin.H {
 }
 
 func FormatTreeRef(c *gin.Context, m plumbing.Hash) gin.H {
-	return FormatRef(c, m, "git/trees")
+	return FormatRef(c, m, "trees")
 }
 
 func FormatBranchRef(c Context, branch *plumbing.Reference) gin.H {
@@ -158,7 +166,7 @@ func FormatTree(c Context, tree *object.Tree, recursive bool) gin.H {
 					"mode": entry.Mode,
 					"type": "tree",
 					"sha":  entry.Hash.String(),
-					"url":  c.BuildUri("repos", c.namespace, c.repo, "git/trees", entry.Hash.String()),
+					"url":  c.BuildUri("repos", c.namespace, c.repo, "trees", entry.Hash.String()),
 				})
 			} else if entry.Mode == filemode.Submodule {
 				r = append(r, gin.H{
@@ -166,14 +174,21 @@ func FormatTree(c Context, tree *object.Tree, recursive bool) gin.H {
 					"mode": entry.Mode,
 					"type": "submodule",
 					"sha":  entry.Hash.String(),
-					// "url":  c.BuildUri("repos", c.namespace, c.repo, "git/trees", entry.Hash.String()),
+					// "url":  c.BuildUri("repos", c.namespace, c.repo, "trees", entry.Hash.String()),
 				})
 			}
 		}
 	}
 	return gin.H{
-		"url":  c.BuildUri("repos", c.namespace, c.repo, "git/trees", tree.Hash.String()),
+		"url":  c.BuildUri("repos", c.namespace, c.repo, "trees", tree.Hash.String()),
 		"sha":  tree.Hash.String(),
 		"tree": r,
 	}
+}
+
+func NewHash(s string) (plumbing.Hash, error) {
+	b, err := hex.DecodeString(s)
+	var h plumbing.Hash
+	copy(h[:], b)
+	return h, err
 }
