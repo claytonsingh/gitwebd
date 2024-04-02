@@ -267,11 +267,10 @@ func main() {
 
 		read := func(tree *object.Tree) error {
 			if tree, err := tree.File(c.Param("path")[1:]); err == nil {
-				blob := tree.Blob
-				if reader, err := blob.Reader(); err == nil {
+				if reader, err := tree.Blob.Reader(); err == nil {
 					defer reader.Close()
 
-					c.DataFromReader(http.StatusOK, blob.Size, "application/octet-stream", reader, nil)
+					c.DataFromReader(http.StatusOK, tree.Blob.Size, "application/octet-stream", reader, nil)
 					return nil
 				} else {
 					return err

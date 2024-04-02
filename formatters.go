@@ -163,7 +163,7 @@ func FormatTree(c Context, tree *object.Tree, recursive bool) gin.H {
 			} else if entry.Mode == filemode.Dir {
 				r = append(r, gin.H{
 					"path": entry.Name,
-					"mode": entry.Mode,
+					"mode": entry.Mode.String(),
 					"type": "tree",
 					"sha":  entry.Hash.String(),
 					"url":  c.BuildUri("repos", c.namespace, c.repo, "trees", entry.Hash.String()),
@@ -171,7 +171,7 @@ func FormatTree(c Context, tree *object.Tree, recursive bool) gin.H {
 			} else if entry.Mode == filemode.Submodule {
 				r = append(r, gin.H{
 					"path": entry.Name,
-					"mode": entry.Mode,
+					"mode": entry.Mode.String(),
 					"type": "submodule",
 					"sha":  entry.Hash.String(),
 					// "url":  c.BuildUri("repos", c.namespace, c.repo, "trees", entry.Hash.String()),
